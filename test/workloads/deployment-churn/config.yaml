@@ -8,6 +8,9 @@ name: deployment-churn
 
 # input params (which be default come from override file or CL2... env vars)
 {{$ACTIVE_PODS_PER_NODE := DefaultParam .CL2_PODS_PER_NODE 60}}
+{{$INCLUDE_PVC := DefaultParam .CL2_INCLUDE_PVC false}}
+{{$PVC_STORAGE_CLASS := DefaultParam .CL2_PVC_STORAGE_CLASS azurefile-csi}} # azurefile-csi, azurefile-csi-premium, managed-csi, managed-csi-premium
+{{$PVC_STORAGE_QUANTITY := DefaultParam .CL2_PVC_STORAGE_QUANTITY 8Gi}}    #must be > 100Gi for '-premium' storage classes
 {{$PODS_PER_DEPLOYMENT := DefaultParam .CL2_PODS_PER_DEPLOYMENT 100}}
 {{$TARGET_POD_CHURN := DefaultParam .CL2_TARGET_POD_CHURN 10}}  # i.e. target pod churn, in mutations/sec, for cluster as a whole. (create+update+delete operations per second)
 {{$NS_COUNT := DefaultParam .CL2_NS_COUNT 10}} 
@@ -28,6 +31,7 @@ name: deployment-churn
 {{$targetDeploymentCreationsPerSecond := DivideFloat $targetPodCreationsPerSecond $PODS_PER_DEPLOYMENT}}
 {{$desiredConcurrentDeployments := MaxInt 1 (DivideFloat $desiredConcurrentPods $PODS_PER_DEPLOYMENT)}}  # must have at least 1 deplyoment
 {{$concurrentDeploymentsPerNS := MaxInt 1 (DivideFloat $desiredConcurrentDeployments $NS_COUNT)}}
+{{$deploymentYaml := }}
 
 # Shorten the churn phase, by doing only part of it. We churn (i.e. delete and replace) $CHURN_FRACTION of the deployments
 {{$deploymentsToRecreatePerNS := MultiplyInt $concurrentDeploymentsPerNS $CHURN_FRACTION}}  # re-create this many
@@ -83,6 +87,16 @@ steps:
        action: start
        label: overall duration  # can't just "declare" a timer, without starting it.
 
+# Create PVCs if test requires
+{{if $INCLUDE_PVC}}
+- module:
+    path: /pvc.yaml
+    params:
+      pvcStorageQuantity: {{$PVC_STORAGE_QUANTITY}}  # this is a setup round. It has nothing to delete
+      pvcStorageClass:  {{$PVC_STORAGE_CLASS}}
+      desc: Create PVC
+{{end}}
+
 ### Create initial set of pods
 - module:
     path: /churn-module.yaml
@@ -94,6 +108,7 @@ steps:
       podsPerDeployment: {{$PODS_PER_DEPLOYMENT}}
       timeout: {{$podStartTimeout}}
       nsCount: {{$NS_COUNT}}
+      includePvc: {{$INCLUDE_PVC}}
 
 ### One or more rounds of churn
 {{range $i := Loop $REPEATS}}
@@ -107,6 +122,7 @@ steps:
       podsPerDeployment: {{$PODS_PER_DEPLOYMENT}}
       timeout: {{$podStartTimeout}}
       nsCount: {{$NS_COUNT}}
+      includePvc: {{$INCLUDE_PVC}}
 {{end}}      
 
 ### cleanup
@@ -122,6 +138,7 @@ steps:
       totalPods: 0
       timeout: {{$podStartTimeout}}
       nsCount: {{$NS_COUNT}}
+      includePvc: {{$INCLUDE_PVC}}
 {{end}}
 
 ### Gather measurements

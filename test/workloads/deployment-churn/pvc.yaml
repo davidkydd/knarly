@@ -1,0 +1,11 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: test-vol
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: {{$.pvcStorageQuantity}} # when supporting premium storage classes, this will need to change to >= 100Gi as that is minimum supported, see note: https://docs.microsoft.com/en-us/azure/aks/azure-files-csi#dynamically-create-azure-files-pvs-by-using-the-built-in-storage-classes
+  storageClassName: {{$.pvcStorageClass}}

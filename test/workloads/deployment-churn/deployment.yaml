@@ -18,4 +18,24 @@ spec:
     spec:    
       containers:
       - name: load-test
-        image: k8s.gcr.io/pause:3.1
+        image: mcr.microsoft.com/oss/kubernetes/pause:3.4.1 #locally present image, prevents need to pull
+{{if $.includePvc}}
+        volumeMounts:
+        - mountPath: /data
+          name: {{.Name}}-data
+      volumes:
+      - name: {{.Name}}-data
+        persistentVolumeClaim:
+          claimName: {{.Name}}-vol
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{.Name}}
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: {{$.pvcStorageQuantity}} # when supporting premium storage classes, this will need to change to >= 100Gi as that is minimum supported, see note: https://docs.microsoft.com/en-us/azure/aks/azure-files-csi#dynamically-create-azure-files-pvs-by-using-the-built-in-storage-classes
+  storageClassName: {{$.pvcStorageClass}}
+{{end}}

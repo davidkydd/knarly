@@ -74,6 +74,7 @@ steps:
       templateFillMap:
         testRound: r{{$.roundNumber}}
         replicas: {{$.podsPerDeployment}}
+        includePvc: {{$.includePvc}}
 
 - name: end CRUD timer
   measurements:
