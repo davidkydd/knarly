@@ -16,11 +16,13 @@ name: deployment-churn
 {{$CHURN_FRACTION := DefaultParam .CL2_CHURN_FRACTION 1.0}}  # Set below 1 for faster churn phase, IFF cleanup is set to 0
 {{$REPEATS := DefaultParam .CL2_REPEATS 1}}  # How many times to repeat the churn phase.  Set to non-zero value for longer-running tests
 {{$CLEANUP := DefaultParam .CL2_CLEANUP 1}}
+
 {{$DELETE_AUTOMANAGED_NAMESPACES := DefaultParam .CL2_DELETE_AUTOMANAGED_NAMESPACES true}}
 {{$DELETE_STALE_NAMESPACES := DefaultParam .CL2_DELETE_STALE_NAMESPACES true}}
 {{$TEST_ID := DefaultParam .CL2_TEST_ID "deployment-churn"}} #default to name of test
 {{$NS_PREFIX := DefaultParam .CL2_NS_PREFIX ""}}
 {{$POD_CONTROLLER := DefaultParam .CL2_POD_CONTROLLER "deployment"}}
+{{$POD_STARTUP_LATENCY_THRESHOLD := DefaultParam .CL2_POD_STARTUP_LATENCY_THRESHOLD "30s"}}
 # Note on CLEANUP of pods and deployments that we create.
 # By default we do clean them up explicitly, because by default letting them just get deleted with the namespace is slow.
 # However, if delete-collection-workers has been set to a highish value (e.g. 250) in the API server params, then
@@ -99,6 +101,16 @@ steps:
     Params:
        action: start
        label: overall duration  # can't just "declare" a timer, without starting it.
+  # - Identifier: APIResponsivenessPrometheusSimple
+  #   Method: APIResponsivenessPrometheus
+  #   Params:
+  # #     action: start
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: start
+      labelSelector: test-round
+      threshold: {{$POD_STARTUP_LATENCY_THRESHOLD}}
 
 ### Create initial set of pods
 - module:
@@ -136,6 +148,18 @@ steps:
       testId: {{$TEST_ID}}
 {{end}}
 
+### Gather measurements
+- name: Gather Pod startup measurements
+  measurements:
+  # - Identifier: APIResponsivenessPrometheusSimple
+  #   Method: APIResponsivenessPrometheusSimple
+  #   Params:
+  #     action: gather
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: gather
+
 ### cleanup
 {{if ne $CLEANUP 0}}
 - module:
@@ -163,3 +187,7 @@ steps:
     Method: Timer
     Params:
       action: gather
+  # - Identifier: APIResponsivenessPrometheusSimple
+  #   Method: APIResponsivenessPrometheusSimple
+  #   Params:
+  #     action: gather
